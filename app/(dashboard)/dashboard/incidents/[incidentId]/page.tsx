@@ -7,27 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 import { unstable_noStore } from "next/cache";
-
-import type { Incident, IncidentUpdate, Service } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
-
-/**
- * Explicit relation typing (fixes TS build errors)
- */
-type IncidentWithRelations = Incident & {
-  service: Service;
-  updates: IncidentUpdate[];
-};
 
 export default async function IncidentDetailPage({
   params,
 }: {
   params: Promise<{ incidentId: string }>;
 }) {
-  // Prevent RSC caching issues
   unstable_noStore();
 
   const { incidentId } = await params;
@@ -49,6 +39,17 @@ export default async function IncidentDetailPage({
   });
 
   if (!org) redirect("/dashboard");
+
+  /**
+   * Prisma-safe typing using validator
+   * (best practice with Prisma 7+)
+   */
+  type IncidentWithRelations = Prisma.IncidentGetPayload<{
+    include: {
+      service: true;
+      updates: true;
+    };
+  }>;
 
   const incident: IncidentWithRelations | null =
     await prisma.incident.findFirst({
@@ -133,7 +134,7 @@ export default async function IncidentDetailPage({
           </p>
         ) : (
           <div className="space-y-3">
-            {incident.updates.map((u: IncidentUpdate) => (
+            {incident.updates.map((u) => (
               <Card key={u.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
