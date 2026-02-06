@@ -1,33 +1,20 @@
 import { prisma } from "@/lib/prisma";
+import { NextRequest } from "next/server";
 
 export async function GET(
-  req: Request,
-  { params }: { params: { slug: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  // IMPORTANT: unwrap params in Next.js 16
+  const { slug } = await params;
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Send initial data
-      const org = await prisma.organization.findUnique({
-        where: { slug: params.slug },
-        include: {
-          services: true,
-          incidents: {
-            where: { status: { not: "RESOLVED" } },
-            include: { service: true, updates: true },
-          },
-        },
-      });
-
-      controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify(org)}\n\n`)
-      );
-
-      // Poll for updates every 5 seconds
-      const interval = setInterval(async () => {
-        const updated = await prisma.organization.findUnique({
-          where: { slug: params.slug },
+      async function sendData() {
+        const org = await prisma.organization.findUnique({
+          where: { slug },
           include: {
             services: true,
             incidents: {
@@ -38,9 +25,15 @@ export async function GET(
         });
 
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(updated)}\n\n`)
+          encoder.encode(`data: ${JSON.stringify(org)}\n\n`)
         );
-      }, 5000);
+      }
+
+      // Initial push
+      await sendData();
+
+      // Poll every 5s
+      const interval = setInterval(sendData, 5000);
 
       req.signal.addEventListener("abort", () => {
         clearInterval(interval);
@@ -52,7 +45,7 @@ export async function GET(
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
     },
   });
