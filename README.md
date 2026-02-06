@@ -102,5 +102,3 @@ NEXT_PUBLIC_PUSHER_CLUSTER=
 
 Your public status page is available at:
 `/status/[your-org-slug]`
-
-## Project Structure
