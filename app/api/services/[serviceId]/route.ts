@@ -2,6 +2,8 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+// 1. Import the ServiceStatus enum
+import { ServiceStatus } from "@prisma/client";
 
 export async function PATCH(
   req: Request,
@@ -38,7 +40,8 @@ export async function PATCH(
         ...(description === null || typeof description === "string"
           ? { description }
           : {}),
-        ...(typeof status === "string" ? { status } : {}),
+        // 2. Cast the status string to the ServiceStatus enum
+        ...(typeof status === "string" ? { status: status as ServiceStatus } : {}),
       },
     });
 
@@ -51,4 +54,3 @@ export async function PATCH(
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
-
