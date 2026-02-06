@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { pusherServer } from "@/lib/pusher";
+import { IncidentStatus, ImpactLevel } from "@prisma/client";
 
 export async function PATCH(
   req: Request,
@@ -13,7 +14,6 @@ export async function PATCH(
     if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
     const effectiveOrgId = orgId ?? userId;
-
     const { incidentId } = await params;
 
     const org = await prisma.organization.findUnique({
@@ -35,7 +35,8 @@ export async function PATCH(
       updateMessage?: string;
     };
 
-    const nextStatus = typeof body.status === "string" ? body.status : undefined;
+    const nextStatus = typeof body.status === "string" ? (body.status as IncidentStatus) : undefined;
+    
     const nextResolvedAt =
       nextStatus === "RESOLVED"
         ? incident.resolvedAt ?? new Date()
@@ -50,8 +51,9 @@ export async function PATCH(
         ...(typeof body.description === "string"
           ? { description: body.description }
           : {}),
-        ...(typeof body.status === "string" ? { status: body.status } : {}),
-        ...(typeof body.impact === "string" ? { impact: body.impact } : {}),
+        // 2. Cast status and impact to their respective Prisma Enums
+        ...(typeof body.status === "string" ? { status: body.status as IncidentStatus } : {}),
+        ...(typeof body.impact === "string" ? { impact: body.impact as ImpactLevel } : {}),
         ...(nextResolvedAt !== undefined ? { resolvedAt: nextResolvedAt } : {}),
       },
     });
@@ -64,7 +66,7 @@ export async function PATCH(
         data: {
           incidentId: incident.id,
           message: updateMessage,
-          status: updated.status,
+          status: updated.status, // updated.status is already typed correctly here
         },
       });
     }
@@ -83,4 +85,3 @@ export async function PATCH(
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
-
